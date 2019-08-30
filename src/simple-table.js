@@ -92,7 +92,7 @@ const UIController = (function () {
             const { row, col } = e.target.dataset;
             const newElement = document.createElement('input');
             newElement.type = 'text';
-            newElement.style = 'width: 150px';
+            // newElement.style = 'width: 150px';
             newElement.setAttribute('data-content', `${row}-${col}`);
             newElement.value = e.target.textContent;
             e.target.classList.add('for-removal');
@@ -200,7 +200,6 @@ const Table = (function (UIController) {
         const isEditEnabled = state.data.header[col].editEnabled ? state.data.header[col].editEnabled : false;
         if (!isEditEnabled)
             return;
-        console.log(row, col, isEditEnabled);
         e.target.setAttribute('data-old-value', e.target.textContent);
         e.target.textContent = '';
         UIController.cancelAllEditors();
@@ -208,7 +207,6 @@ const Table = (function (UIController) {
         el.addEventListener('keyup', (e) => {
             const { row, col, name } = e.target.parentElement.dataset;
             if (e.keyCode === 13) {
-                console.log('save changes and close', e.target.value, row, col, name);
                 state.dataOriginal.body[row][name] = e.target.value;
             }
             if (e.keyCode === 13 || e.keyCode === 27) {
