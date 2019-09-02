@@ -6,7 +6,8 @@ const UIController = (function () {
         table: null
     }
 
-    function render(data) {
+    function render(state) {
+        const { data, options } = state;
         const thead = UISelectors.table.querySelector('thead');
         while (thead.firstChild)
             thead.removeChild(thead.firstChild);
@@ -23,6 +24,11 @@ const UIController = (function () {
             thead.appendChild(th);
         }
 
+        if (options.removeButton) {
+            const th = document.createElement('th');
+            thead.appendChild(th);
+        }
+
         // render body
         const tbody = UISelectors.table.querySelector('tbody');
         while (tbody.firstChild)
@@ -30,10 +36,14 @@ const UIController = (function () {
         tbody.innerHtml = '';
 
         for (let i = 0; i < data.body.length; i++) {
+
             const tr = document.createElement('tr');
             const keys = Object.keys(data.body[i]);
             const values = Object.values(data.body[i]);
             for (let j = 0; j < values.length; j++) {
+                if (keys[j].startsWith('_'))
+                    continue;
+
                 const td = document.createElement('td');
                 td.setAttribute('data-row', i);
                 td.setAttribute('data-col', j);
@@ -41,35 +51,60 @@ const UIController = (function () {
                 td.textContent = values[j];
                 tr.appendChild(td);
             }
+            // add rm button
+            if (options.removeButton) {
+                const td = document.createElement('td');
+                td.innerHTML = `<button class='remove-button btn red lighten-3' data-remove-row="${data.body[i]._id}">X</button>`;
+                tr.appendChild(td);
+            }
             tbody.appendChild(tr);
         }
 
+        // toggle buttons
+        const startOffset = (state.options.currentPage + 1) * state.options.itemsPerPage;
+        const nextPage = state.dataOriginal.body.slice(startOffset, startOffset + state.options.itemsPerPage);
+
+        if (nextPage.length === 0)
+            UIController.disableNextBtn();
+        else
+            UIController.enableNextBtn();
+
+        if (state.dataOriginal.body.length === state.options.itemsPerPage)
+            UIController.disableLastBtn();
     }
 
     function init(table) {
         UISelectors.table = table;
     }
 
+    function disableLastBtn() {
+        if (UISelectors.lastButton)
+            UISelectors.lastButton.setAttribute('disabled', true);
+    }
+
+    function enableLastBtn() {
+        if (UISelectors.lastButton)
+            UISelectors.lastButton.removeAttribute('disabled');
+    }
+
+    function disableNextBtn() {
+        if (UISelectors.nextButton)
+            UISelectors.nextButton.setAttribute('disabled', true);
+    }
+
+    function enableNextBtn() {
+        if (UISelectors.nextButton)
+            UISelectors.nextButton.removeAttribute('disabled');
+    }
+
     return {
         getSelectors: function () {
             return UISelectors;
         },
-        disableLastBtn: function () {
-            if (UISelectors.lastButton)
-                UISelectors.lastButton.setAttribute('disabled', true);
-        },
-        enableLastBtn: function () {
-            if (UISelectors.lastButton)
-                UISelectors.lastButton.removeAttribute('disabled');
-        },
-        disableNextBtn: function () {
-            if (UISelectors.nextButton)
-                UISelectors.nextButton.setAttribute('disabled', true);
-        },
-        enableNextBtn: function () {
-            if (UISelectors.nextButton)
-                UISelectors.nextButton.removeAttribute('disabled');
-        },
+        disableLastBtn: disableLastBtn,
+        enableLastBtn: enableLastBtn,
+        disableNextBtn: disableNextBtn,
+        enableNextBtn: enableNextBtn,
         getTableHeader: function () {
             return UISelectors.table.querySelector('thead');
         },
@@ -165,34 +200,56 @@ const Table = (function (UIController) {
             return;
         state.data = sortData(columnNumber, sortOrder);
         state.data.body = paginateData(state.data.body);
-        UIController.render(state.data);
+        UIController.render(state);
     }
 
     function onNextButton() {
         state.options.currentPage += 1;
 
-        if (state.options.currentPage > 0)
+        if (state.options.currentPage > 0) {
             UIController.enableLastBtn();
+        }
         state.data.body = paginateData(state.dataOriginal.body);
         const startOffset = (state.options.currentPage + 1) * state.options.itemsPerPage;
         const nextPage = state.dataOriginal.body.slice(startOffset, startOffset + state.options.itemsPerPage);
         if (nextPage.length === 0)
             UIController.disableNextBtn();
-        UIController.render(state.data);
+        UIController.render(state);
     }
 
     function onLastButton() {
         state.options.currentPage -= 1;
         if (state.options.currentPage <= 0)
             UIController.disableLastBtn();
-
         UIController.enableNextBtn();
+
+        const startOffset = (state.options.currentPage + 1) * state.options.itemsPerPage;
+        const nextPage = state.dataOriginal.body.slice(startOffset, startOffset - state.options.itemsPerPage);
+
+        console.log(nextPage.length);
+        if (nextPage.length === 0) {
+            UIController.disableLastBtn();
+        }
+
         state.data.body = paginateData(state.dataOriginal.body);
-        UIController.render(state.data);
+        UIController.render(state);
     }
 
     function onCellClick(e) {
-        const { row, col } = e.target.dataset;
+        const { row, col, removeRow } = e.target.dataset;
+
+        if (e.target.classList.contains('remove-button')) {
+            state.dataOriginal.body = state.dataOriginal.body.filter(x => x._id != removeRow);
+            state.data.body = [...state.dataOriginal.body];
+            state.data.body = paginateData(state.data.body);
+
+            if (state.data.body.length === 0) {
+                console.log('all items are removed on current page');
+                onLastButton();
+            }
+            UIController.render(state);
+            return;
+        }
 
         if (e.target.tagName === 'INPUT')
             return;
@@ -218,7 +275,6 @@ const Table = (function (UIController) {
     function onSearch(e) {
         state.options.searchBy = e.target.value;
         if (e.keyCode === 13 && e.target.value.length > 0) {
-            console.log('searching...');
             state.options.currentPage = 0;
             // filter data for search box and render
             const searchResults = [];
@@ -234,11 +290,10 @@ const Table = (function (UIController) {
             }
             if (searchResults) {
                 state.data.body = searchResults;
-                UIController.render(state.data);
+                UIController.render(state);
             }
 
             UIController.disableLastBtn();
-
             const startOffset = (state.options.currentPage + 1) * state.options.itemsPerPage;
             const nextPage = state.data.body.slice(startOffset, startOffset + state.options.itemsPerPage);
             if (nextPage.length === 0)
@@ -248,7 +303,7 @@ const Table = (function (UIController) {
             state.options.currentPage = 0;
             state.data.body = [...state.dataOriginal.body];
             state.data.body = paginateData(state.data.body);
-            UIController.render(state.data);
+            UIController.render(state);
         }
     }
 
@@ -265,6 +320,10 @@ const Table = (function (UIController) {
 
 
         UIController.init(table);
+
+        for (let i = 0; i < data.body.length; i++)
+            data.body[i]._id = i;
+
         state.dataOriginal = { ...data };
         state.data = { ...data };
         state.options = { ...options };
@@ -277,7 +336,7 @@ const Table = (function (UIController) {
         }
 
         state.data.body = paginateData(state.data.body);
-        UIController.render(state.data);
+        UIController.render(state);
         UIController.getTableHeader().addEventListener('click', onTableSort);
         UIController.getTableBody().addEventListener('click', onCellClick);
         UISelectors.nextButton.addEventListener('click', onNextButton);

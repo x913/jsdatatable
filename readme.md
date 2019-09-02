@@ -100,5 +100,7 @@ You need to provide header with array of header-objects which shoud have a name 
 - sortEnabled: boolean value with true or false you can disable or enable sorting on certain columns
 - searchEnabled: boolean value you can enable or disable searching with filter box with this propery
 - editEnabled: you can enable builtin editor for cell by setting editEnabled to true
+- itemsPerPage: elements on page to display
+- removeButton: boolean value - append "remove" button to each row of the table
 
 And also you need to provide a body. Body is a simple array with objects, each object is a table row.
